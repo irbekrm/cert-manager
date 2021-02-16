@@ -43,6 +43,7 @@ import (
 	"github.com/jetstack/cert-manager/pkg/controller/certificates/trigger/policies"
 	logf "github.com/jetstack/cert-manager/pkg/logs"
 	"github.com/jetstack/cert-manager/pkg/scheduler"
+	"github.com/jetstack/cert-manager/pkg/util/pki"
 	"github.com/jetstack/cert-manager/pkg/util/predicate"
 )
 
@@ -63,15 +64,16 @@ const (
 // certificate is required.
 type controller struct {
 	// the trigger policies to run - named here to make testing simpler
-	policyChain              policies.Chain
-	certificateLister        cmlisters.CertificateLister
-	certificateRequestLister cmlisters.CertificateRequestLister
-	secretLister             corelisters.SecretLister
-	client                   cmclient.Interface
-	recorder                 record.EventRecorder
-	clock                    clock.Clock
-	scheduledWorkQueue       scheduler.ScheduledWorkQueue
-	gatherer                 *policies.Gatherer
+	policyChain                      policies.Chain
+	certificateLister                cmlisters.CertificateLister
+	certificateRequestLister         cmlisters.CertificateRequestLister
+	secretLister                     corelisters.SecretLister
+	client                           cmclient.Interface
+	recorder                         record.EventRecorder
+	clock                            clock.Clock
+	scheduledWorkQueue               scheduler.ScheduledWorkQueue
+	gatherer                         *policies.Gatherer
+	defaultRenewBeforeExpiryDuration time.Duration
 }
 
 func NewController(
@@ -82,6 +84,7 @@ func NewController(
 	recorder record.EventRecorder,
 	clock clock.Clock,
 	chain policies.Chain,
+	defaultRenewBeforeExpiryDuration time.Duration,
 ) (*controller, workqueue.RateLimitingInterface, []cache.InformerSynced) {
 	// create a queue used to queue up items to be processed
 	queue := workqueue.NewNamedRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(time.Second*1, time.Second*30), ControllerName)
@@ -180,6 +183,26 @@ func (c *controller) ProcessItem(ctx context.Context, key string) error {
 	}
 
 	crt = crt.DeepCopy()
+
+	// Policy chain must be evaluated with CurrentCertificateNearingExpiry last,
+	// else this check might cause failure to renew if a subseqent condition would have evaluated to true.
+	// Perhaps we could perform this check in CurrentCertificateNearingExpiry policy check,
+	// but then it needs access to defaultRenewBeforeExpiryDuration which doesn't seem to logically fit Input struct.
+	// TODO: turn 'reason' values into constants
+	if reason == "Renewing" {
+		// calculate renewal time of the cert currently stored in the secret
+		rt, err := c.renewalTimeFromSecret(crt, &input)
+		if err != nil {
+			// this should not happen
+			return err
+		}
+		if rt != nil && crt.Status.RenewalTime.Before(rt) {
+			// Certificate has already been renewed,
+			// wait for ReadinessController to update status.RenewalTime
+			return nil
+		}
+	}
+
 	apiutil.SetCertificateCondition(crt, cmapi.CertificateConditionIssuing, cmmeta.ConditionTrue, reason, message)
 	_, err = c.client.CertmanagerV1().Certificates(crt.Namespace).UpdateStatus(ctx, crt, metav1.UpdateOptions{})
 	if err != nil {
@@ -228,6 +251,22 @@ func (c *controller) scheduleRecheckOfCertificateIfRequired(log logr.Logger, key
 	c.scheduledWorkQueue.Add(key, durationUntilRenewalTime)
 }
 
+// TODO: put this function somwhere else, so it can be re-used in ReadinessController
+func (c *controller) renewalTimeFromSecret(crt *cmapi.Certificate, input *policies.Input) (*metav1.Time, error) {
+	if input.Secret == nil || input.Secret.Data == nil {
+		return nil, nil
+	}
+	x509cert, err := pki.DecodeX509CertificateBytes(input.Secret.Data[corev1.TLSCertKey])
+	if err != nil {
+		return nil, err
+	}
+	notAfter := metav1.NewTime(x509cert.NotAfter)
+
+	renewBefore := certificates.RenewBeforeExpiryDuration(crt.Status.NotBefore.Time, crt.Status.NotAfter.Time, crt.Spec.RenewBefore, c.defaultRenewBeforeExpiryDuration)
+	renewalTime := metav1.NewTime(notAfter.Add(-1 * renewBefore))
+	return &renewalTime, nil
+}
+
 // controllerWrapper wraps the `controller` structure to make it implement
 // the controllerpkg.queueingController interface
 type controllerWrapper struct {
@@ -245,6 +284,7 @@ func (c *controllerWrapper) Register(ctx *controllerpkg.Context) (workqueue.Rate
 		ctx.Recorder,
 		ctx.Clock,
 		policies.NewTriggerPolicyChain(ctx.Clock),
+		ctx.CertificateOptions.RenewBeforeExpiryDuration,
 	)
 	c.controller = ctrl
 
