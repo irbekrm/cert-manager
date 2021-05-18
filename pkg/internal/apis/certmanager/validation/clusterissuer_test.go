@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"testing"
 
+	admissionv1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 
@@ -38,66 +39,70 @@ func TestValidateClusterIssuer(t *testing.T) {
 			SelfSigned: &cmapi.SelfSignedIssuer{},
 		}}
 	scenarios := map[string]struct {
-		cfg       *cmapi.Issuer
+		cfg       *cmapi.ClusterIssuer
+		a         *admissionv1.AdmissionRequest
 		expectedE []*field.Error
 		expectedW validation.WarningList
 	}{
-		"v1alpha2 Issuer created": {
-			cfg: &cmapi.Issuer{
-				TypeMeta: metav1.TypeMeta{
-					APIVersion: cmapiv1alpha2.SchemeGroupVersion.String(),
-					Kind:       "Issuer",
-				},
+		"v1alpha2 ClusterIssuer created": {
+			cfg: &cmapi.ClusterIssuer{
 				Spec: baseIssuerConfig,
+			},
+			a: &admissionv1.AdmissionRequest{
+				Kind: metav1.GroupVersionKind{Group: "cert-manager.io",
+					Version: "v1alpha2",
+					Kind:    "ClusterIssuer"},
 			},
 			expectedE: []*field.Error{},
 			expectedW: validation.WarningList{
 				fmt.Sprintf(deprecationMessageTemplate,
 					cmapiv1alpha2.SchemeGroupVersion.String(),
-					"Issuer",
+					"ClusterIssuer",
 					cmapiv1.SchemeGroupVersion.String(),
-					"Issuer"),
+					"ClusterIssuer"),
 			},
 		},
-		"v1alpha3 Issuer created": {
-			cfg: &cmapi.Issuer{
-				TypeMeta: metav1.TypeMeta{
-					APIVersion: cmapiv1alpha3.SchemeGroupVersion.String(),
-					Kind:       "Issuer",
-				},
+		"v1alpha3 ClusterIssuer created": {
+			cfg: &cmapi.ClusterIssuer{
 				Spec: baseIssuerConfig,
+			},
+			a: &admissionv1.AdmissionRequest{
+				Kind: metav1.GroupVersionKind{Group: "cert-manager.io",
+					Version: "v1alpha3",
+					Kind:    "ClusterIssuer"},
 			},
 			expectedE: []*field.Error{},
 			expectedW: validation.WarningList{
 				fmt.Sprintf(deprecationMessageTemplate,
 					cmapiv1alpha3.SchemeGroupVersion.String(),
-					"Issuer",
+					"ClusterIssuer",
 					cmapiv1.SchemeGroupVersion.String(),
-					"Issuer"),
+					"ClusterIssuer"),
 			},
 		},
-		"v1beta1 Issuer created": {
-			cfg: &cmapi.Issuer{
-				TypeMeta: metav1.TypeMeta{
-					APIVersion: cmapiv1beta1.SchemeGroupVersion.String(),
-					Kind:       "Issuer",
-				},
+		"v1beta1 ClusterIssuer created": {
+			cfg: &cmapi.ClusterIssuer{
 				Spec: baseIssuerConfig,
+			},
+			a: &admissionv1.AdmissionRequest{
+				Kind: metav1.GroupVersionKind{Group: "cert-manager.io",
+					Version: "v1beta1",
+					Kind:    "ClusterIssuer"},
 			},
 			expectedE: []*field.Error{},
 			expectedW: validation.WarningList{
 				fmt.Sprintf(deprecationMessageTemplate,
 					cmapiv1beta1.SchemeGroupVersion.String(),
-					"Issuer",
+					"ClusterIssuer",
 					cmapiv1.SchemeGroupVersion.String(),
-					"Issuer"),
+					"ClusterIssuer"),
 			},
 		},
 	}
 
 	for n, s := range scenarios {
 		t.Run(n, func(t *testing.T) {
-			gotE, gotW := ValidateIssuer(nil, s.cfg)
+			gotE, gotW := ValidateClusterIssuer(s.a, s.cfg)
 			if len(gotE) != len(s.expectedE) {
 				t.Fatalf("Expected errors %v but got %v", s.expectedE, gotE)
 			}
@@ -130,16 +135,18 @@ func TestUpdateValidateClusterIssuer(t *testing.T) {
 	}
 	scenarios := map[string]struct {
 		iss       *cmapi.ClusterIssuer
+		a         *admissionv1.AdmissionRequest
 		expectedE []*field.Error
 		expectedW validation.WarningList
 	}{
 		"ClusterIssuer updated to v1alpha2 version": {
 			iss: &cmapi.ClusterIssuer{
-				TypeMeta: metav1.TypeMeta{
-					APIVersion: cmapiv1alpha2.SchemeGroupVersion.String(),
-					Kind:       "ClusterIssuer",
-				},
 				Spec: baseIssuerConfig,
+			},
+			a: &admissionv1.AdmissionRequest{
+				Kind: metav1.GroupVersionKind{Group: "cert-manager.io",
+					Version: "v1alpha2",
+					Kind:    "ClusterIssuer"},
 			},
 			expectedE: []*field.Error{},
 			expectedW: validation.WarningList{
@@ -152,11 +159,12 @@ func TestUpdateValidateClusterIssuer(t *testing.T) {
 		},
 		"ClusterIssuer updated to v1alpha3 version": {
 			iss: &cmapi.ClusterIssuer{
-				TypeMeta: metav1.TypeMeta{
-					APIVersion: cmapiv1alpha3.SchemeGroupVersion.String(),
-					Kind:       "ClusterIssuer",
-				},
 				Spec: baseIssuerConfig,
+			},
+			a: &admissionv1.AdmissionRequest{
+				Kind: metav1.GroupVersionKind{Group: "cert-manager.io",
+					Version: "v1alpha3",
+					Kind:    "ClusterIssuer"},
 			},
 			expectedE: []*field.Error{},
 			expectedW: validation.WarningList{
@@ -169,11 +177,12 @@ func TestUpdateValidateClusterIssuer(t *testing.T) {
 		},
 		"ClusterIssuer updated to v1beta1 version": {
 			iss: &cmapi.ClusterIssuer{
-				TypeMeta: metav1.TypeMeta{
-					APIVersion: cmapiv1beta1.SchemeGroupVersion.String(),
-					Kind:       "ClusterIssuer",
-				},
 				Spec: baseIssuerConfig,
+			},
+			a: &admissionv1.AdmissionRequest{
+				Kind: metav1.GroupVersionKind{Group: "cert-manager.io",
+					Version: "v1beta1",
+					Kind:    "ClusterIssuer"},
 			},
 			expectedE: []*field.Error{},
 			expectedW: validation.WarningList{
@@ -188,7 +197,7 @@ func TestUpdateValidateClusterIssuer(t *testing.T) {
 
 	for n, s := range scenarios {
 		t.Run(n, func(t *testing.T) {
-			gotE, gotW := ValidateUpdateClusterIssuer(nil, &baseIssuer, s.iss)
+			gotE, gotW := ValidateUpdateClusterIssuer(s.a, &baseIssuer, s.iss)
 			if len(gotE) != len(s.expectedE) {
 				t.Fatalf("Expected errors %v but got %v", s.expectedE, gotE)
 			}

@@ -23,6 +23,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -1141,15 +1142,17 @@ func TestValidateIssuer(t *testing.T) {
 		}}
 	scenarios := map[string]struct {
 		cfg       *cmapi.Issuer
+		a         *admissionv1.AdmissionRequest
 		expectedE []*field.Error
 		expectedW validation.WarningList
 	}{
 		"v1alpha2 Issuer created": {
+			a: &admissionv1.AdmissionRequest{
+				Kind: metav1.GroupVersionKind{Group: "cert-manager.io",
+					Version: "v1alpha2",
+					Kind:    "Issuer"},
+			},
 			cfg: &cmapi.Issuer{
-				TypeMeta: metav1.TypeMeta{
-					APIVersion: cmapiv1alpha2.SchemeGroupVersion.String(),
-					Kind:       "Issuer",
-				},
 				Spec: baseIssuerConfig,
 			},
 			expectedE: []*field.Error{},
@@ -1163,11 +1166,12 @@ func TestValidateIssuer(t *testing.T) {
 		},
 		"v1alpha3 Issuer created": {
 			cfg: &cmapi.Issuer{
-				TypeMeta: metav1.TypeMeta{
-					APIVersion: cmapiv1alpha3.SchemeGroupVersion.String(),
-					Kind:       "Issuer",
-				},
 				Spec: baseIssuerConfig,
+			},
+			a: &admissionv1.AdmissionRequest{
+				Kind: metav1.GroupVersionKind{Group: "cert-manager.io",
+					Version: "v1alpha3",
+					Kind:    "Issuer"},
 			},
 			expectedE: []*field.Error{},
 			expectedW: validation.WarningList{
@@ -1180,11 +1184,12 @@ func TestValidateIssuer(t *testing.T) {
 		},
 		"v1beta1 Issuer created": {
 			cfg: &cmapi.Issuer{
-				TypeMeta: metav1.TypeMeta{
-					APIVersion: cmapiv1beta1.SchemeGroupVersion.String(),
-					Kind:       "Issuer",
-				},
 				Spec: baseIssuerConfig,
+			},
+			a: &admissionv1.AdmissionRequest{
+				Kind: metav1.GroupVersionKind{Group: "cert-manager.io",
+					Version: "v1beta1",
+					Kind:    "Issuer"},
 			},
 			expectedE: []*field.Error{},
 			expectedW: validation.WarningList{
@@ -1199,7 +1204,7 @@ func TestValidateIssuer(t *testing.T) {
 
 	for n, s := range scenarios {
 		t.Run(n, func(t *testing.T) {
-			gotE, gotW := ValidateIssuer(nil, s.cfg)
+			gotE, gotW := ValidateIssuer(s.a, s.cfg)
 			if len(gotE) != len(s.expectedE) {
 				t.Fatalf("Expected errors %v but got %v", s.expectedE, gotE)
 			}
@@ -1232,16 +1237,18 @@ func TestUpdateValidateIssuer(t *testing.T) {
 	}
 	scenarios := map[string]struct {
 		iss       *cmapi.Issuer
+		a         *admissionv1.AdmissionRequest
 		expectedE []*field.Error
 		expectedW validation.WarningList
 	}{
 		"Issuer updated to v1alpha2 version": {
 			iss: &cmapi.Issuer{
-				TypeMeta: metav1.TypeMeta{
-					APIVersion: cmapiv1alpha2.SchemeGroupVersion.String(),
-					Kind:       "Issuer",
-				},
 				Spec: baseIssuerConfig,
+			},
+			a: &admissionv1.AdmissionRequest{
+				Kind: metav1.GroupVersionKind{Group: "cert-manager.io",
+					Version: "v1alpha2",
+					Kind:    "Issuer"},
 			},
 			expectedE: []*field.Error{},
 			expectedW: validation.WarningList{
@@ -1254,11 +1261,12 @@ func TestUpdateValidateIssuer(t *testing.T) {
 		},
 		"Issuer updated to v1alpha3 version": {
 			iss: &cmapi.Issuer{
-				TypeMeta: metav1.TypeMeta{
-					APIVersion: cmapiv1alpha3.SchemeGroupVersion.String(),
-					Kind:       "Issuer",
-				},
 				Spec: baseIssuerConfig,
+			},
+			a: &admissionv1.AdmissionRequest{
+				Kind: metav1.GroupVersionKind{Group: "cert-manager.io",
+					Version: "v1alpha3",
+					Kind:    "Issuer"},
 			},
 			expectedE: []*field.Error{},
 			expectedW: validation.WarningList{
@@ -1271,11 +1279,12 @@ func TestUpdateValidateIssuer(t *testing.T) {
 		},
 		"Issuer updated to v1beta1 version": {
 			iss: &cmapi.Issuer{
-				TypeMeta: metav1.TypeMeta{
-					APIVersion: cmapiv1beta1.SchemeGroupVersion.String(),
-					Kind:       "Issuer",
-				},
 				Spec: baseIssuerConfig,
+			},
+			a: &admissionv1.AdmissionRequest{
+				Kind: metav1.GroupVersionKind{Group: "cert-manager.io",
+					Version: "v1beta1",
+					Kind:    "Issuer"},
 			},
 			expectedE: []*field.Error{},
 			expectedW: validation.WarningList{
@@ -1290,7 +1299,7 @@ func TestUpdateValidateIssuer(t *testing.T) {
 
 	for n, s := range scenarios {
 		t.Run(n, func(t *testing.T) {
-			gotE, gotW := ValidateUpdateIssuer(nil, &baseIssuer, s.iss)
+			gotE, gotW := ValidateUpdateIssuer(s.a, &baseIssuer, s.iss)
 			if len(gotE) != len(s.expectedE) {
 				t.Fatalf("Expected errors %v but got %v", s.expectedE, gotE)
 			}

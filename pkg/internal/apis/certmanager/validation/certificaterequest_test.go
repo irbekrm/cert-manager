@@ -23,6 +23,7 @@ import (
 	"reflect"
 	"testing"
 
+	admissionv1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 
@@ -63,9 +64,17 @@ func TestValidateCertificateRequestUpdate(t *testing.T) {
 			},
 		},
 	}
+	someAdmissionRequest := &admissionv1.AdmissionRequest{
+		Kind: metav1.GroupVersionKind{
+			Group:   "test",
+			Kind:    "test",
+			Version: "test",
+		},
+	}
 
 	tests := map[string]struct {
 		oldCR, newCR *cminternal.CertificateRequest
+		a            *admissionv1.AdmissionRequest
 		wantE        field.ErrorList
 		wantW        validation.WarningList
 	}{
@@ -82,6 +91,7 @@ func TestValidateCertificateRequestUpdate(t *testing.T) {
 					Request: mustGenerateCSR(t, gen.Certificate("test", gen.SetCertificateDNSNames("example.com"))),
 				},
 			},
+			a: someAdmissionRequest,
 			wantE: []*field.Error{
 				field.Forbidden(field.NewPath("metadata", "annotations", "cert-manager.io/foo"), "cannot change cert-manager annotation after creation"),
 				field.Forbidden(field.NewPath("spec"), "cannot change spec after creation"),
@@ -100,6 +110,7 @@ func TestValidateCertificateRequestUpdate(t *testing.T) {
 					Request: mustGenerateCSR(t, gen.Certificate("test", gen.SetCertificateDNSNames("example.com"))),
 				},
 			},
+			a: someAdmissionRequest,
 			wantE: []*field.Error{
 				field.Forbidden(field.NewPath("metadata", "annotations", "acme.cert-manager.io/bar"), "cannot change cert-manager annotation after creation"),
 				field.Forbidden(field.NewPath("spec"), "cannot change spec after creation"),
@@ -108,6 +119,7 @@ func TestValidateCertificateRequestUpdate(t *testing.T) {
 		"if CertificateRequest spec and annotations do not change, don't error": {
 			oldCR: baseCR.DeepCopy(),
 			newCR: baseCR.DeepCopy(),
+			a:     someAdmissionRequest,
 			wantE: nil,
 		},
 		"CertificateRequest with single Approved=true condition that doesn't change, shouldn't error": {
@@ -139,6 +151,7 @@ func TestValidateCertificateRequestUpdate(t *testing.T) {
 					},
 				},
 			},
+			a:     someAdmissionRequest,
 			wantE: nil,
 		},
 		"CertificateRequest with single Denied=true condition that doesn't change, shouldn't error": {
@@ -170,6 +183,7 @@ func TestValidateCertificateRequestUpdate(t *testing.T) {
 					},
 				},
 			},
+			a:     someAdmissionRequest,
 			wantE: nil,
 		},
 		"CertificateRequest with single Approved=false condition that changes, should error": {
@@ -203,6 +217,7 @@ func TestValidateCertificateRequestUpdate(t *testing.T) {
 					},
 				},
 			},
+			a: someAdmissionRequest,
 			wantE: []*field.Error{
 				field.Forbidden(fldPathConditions, "'Approved' condition may not be modified once set"),
 			},
@@ -238,6 +253,7 @@ func TestValidateCertificateRequestUpdate(t *testing.T) {
 					},
 				},
 			},
+			a: someAdmissionRequest,
 			wantE: []*field.Error{
 				field.Forbidden(fldPathConditions, "'Denied' condition may not be modified once set"),
 				field.Invalid(fldPathConditions.Child("Denied"), nil, `"Denied" condition may only be set to True`),
@@ -274,6 +290,7 @@ func TestValidateCertificateRequestUpdate(t *testing.T) {
 					},
 				},
 			},
+			a: someAdmissionRequest,
 			wantE: []*field.Error{
 				field.Forbidden(fldPathConditions, "'Denied' condition may not be modified once set"),
 			},
@@ -309,6 +326,7 @@ func TestValidateCertificateRequestUpdate(t *testing.T) {
 					},
 				},
 			},
+			a: someAdmissionRequest,
 			wantE: []*field.Error{
 				field.Forbidden(fldPathConditions, "'Approved' condition may not be modified once set"),
 			},
@@ -338,6 +356,7 @@ func TestValidateCertificateRequestUpdate(t *testing.T) {
 					},
 				},
 			},
+			a:     someAdmissionRequest,
 			wantE: nil,
 		},
 		"CertificateRequest with no condition that changes to Denied=true, shouldn't error": {
@@ -365,6 +384,7 @@ func TestValidateCertificateRequestUpdate(t *testing.T) {
 					},
 				},
 			},
+			a:     someAdmissionRequest,
 			wantE: nil,
 		},
 		"CertificateRequest with single Approved=true condition that is removed, should error": {
@@ -391,6 +411,7 @@ func TestValidateCertificateRequestUpdate(t *testing.T) {
 					Conditions: []cminternal.CertificateRequestCondition{},
 				},
 			},
+			a: someAdmissionRequest,
 			wantE: []*field.Error{
 				field.Forbidden(fldPathConditions, "'Approved' condition may not be modified once set"),
 			},
@@ -419,6 +440,7 @@ func TestValidateCertificateRequestUpdate(t *testing.T) {
 					Conditions: []cminternal.CertificateRequestCondition{},
 				},
 			},
+			a: someAdmissionRequest,
 			wantE: []*field.Error{
 				field.Forbidden(fldPathConditions, "'Denied' condition may not be modified once set"),
 			},
@@ -431,14 +453,15 @@ func TestValidateCertificateRequestUpdate(t *testing.T) {
 				},
 			},
 			newCR: &cminternal.CertificateRequest{
-				TypeMeta: metav1.TypeMeta{
-					APIVersion: cmapiv1alpha2.SchemeGroupVersion.String(),
-					Kind:       "CertificateRequest",
-				},
 				Spec: cminternal.CertificateRequestSpec{
 					Request:   baseRequest,
 					IssuerRef: validIssuerRef,
 				},
+			},
+			a: &admissionv1.AdmissionRequest{
+				Kind: metav1.GroupVersionKind{Group: "cert-manager.io",
+					Version: "v1alpha2",
+					Kind:    "CertificateRequest"},
 			},
 			wantW: validation.WarningList{
 				fmt.Sprintf(deprecationMessageTemplate,
@@ -456,14 +479,15 @@ func TestValidateCertificateRequestUpdate(t *testing.T) {
 				},
 			},
 			newCR: &cminternal.CertificateRequest{
-				TypeMeta: metav1.TypeMeta{
-					APIVersion: cmapiv1alpha3.SchemeGroupVersion.String(),
-					Kind:       "CertificateRequest",
-				},
 				Spec: cminternal.CertificateRequestSpec{
 					Request:   baseRequest,
 					IssuerRef: validIssuerRef,
 				},
+			},
+			a: &admissionv1.AdmissionRequest{
+				Kind: metav1.GroupVersionKind{Group: "cert-manager.io",
+					Version: "v1alpha3",
+					Kind:    "CertificateRequest"},
 			},
 			wantW: validation.WarningList{
 				fmt.Sprintf(deprecationMessageTemplate,
@@ -481,14 +505,15 @@ func TestValidateCertificateRequestUpdate(t *testing.T) {
 				},
 			},
 			newCR: &cminternal.CertificateRequest{
-				TypeMeta: metav1.TypeMeta{
-					APIVersion: cmapiv1beta1.SchemeGroupVersion.String(),
-					Kind:       "CertificateRequest",
-				},
 				Spec: cminternal.CertificateRequestSpec{
 					Request:   baseRequest,
 					IssuerRef: validIssuerRef,
 				},
+			},
+			a: &admissionv1.AdmissionRequest{
+				Kind: metav1.GroupVersionKind{Group: "cert-manager.io",
+					Version: "v1beta1",
+					Kind:    "CertificateRequest"},
 			},
 			wantW: validation.WarningList{
 				fmt.Sprintf(deprecationMessageTemplate,
@@ -502,7 +527,7 @@ func TestValidateCertificateRequestUpdate(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			gotE, gotW := ValidateUpdateCertificateRequest(nil, test.oldCR, test.newCR)
+			gotE, gotW := ValidateUpdateCertificateRequest(test.a, test.oldCR, test.newCR)
 			for i := range gotE {
 				if gotE[i].Type != field.ErrorTypeForbidden {
 					// filter out the value so it does not print the full CSR in tests
@@ -526,6 +551,7 @@ func TestValidateCertificateRequest(t *testing.T) {
 
 	tests := map[string]struct {
 		cr    *cminternal.CertificateRequest
+		a     *admissionv1.AdmissionRequest
 		wantE field.ErrorList
 		wantW validation.WarningList
 	}{
@@ -537,6 +563,7 @@ func TestValidateCertificateRequest(t *testing.T) {
 					Usages:    nil,
 				},
 			},
+			a:     someAdmissionRequest,
 			wantE: []*field.Error{},
 		},
 		"Test csr with double signature usages": {
@@ -547,6 +574,7 @@ func TestValidateCertificateRequest(t *testing.T) {
 					Usages:    []cminternal.KeyUsage{cminternal.UsageSigning, cminternal.UsageKeyEncipherment},
 				},
 			},
+			a:     someAdmissionRequest,
 			wantE: []*field.Error{},
 		},
 		"Test csr with double extended usages": {
@@ -557,6 +585,7 @@ func TestValidateCertificateRequest(t *testing.T) {
 					Usages:    []cminternal.KeyUsage{cminternal.UsageSigning, cminternal.UsageKeyEncipherment, cminternal.UsageServerAuth, cminternal.UsageClientAuth},
 				},
 			},
+			a:     someAdmissionRequest,
 			wantE: []*field.Error{},
 		},
 		"Test csr with reordered usages": {
@@ -567,6 +596,7 @@ func TestValidateCertificateRequest(t *testing.T) {
 					Usages:    []cminternal.KeyUsage{cminternal.UsageServerAuth, cminternal.UsageClientAuth, cminternal.UsageKeyEncipherment, cminternal.UsageDigitalSignature},
 				},
 			},
+			a:     someAdmissionRequest,
 			wantE: []*field.Error{},
 		},
 		"Test csr that is CA with usages set": {
@@ -578,6 +608,7 @@ func TestValidateCertificateRequest(t *testing.T) {
 					Usages:    []cminternal.KeyUsage{cminternal.UsageAny, cminternal.UsageDigitalSignature, cminternal.UsageKeyEncipherment, cminternal.UsageCertSign},
 				},
 			},
+			a:     someAdmissionRequest,
 			wantE: []*field.Error{},
 		},
 		"Test csr that is CA but no cert sign in usages": {
@@ -589,6 +620,7 @@ func TestValidateCertificateRequest(t *testing.T) {
 					Usages:    []cminternal.KeyUsage{cminternal.UsageAny, cminternal.UsageDigitalSignature, cminternal.UsageKeyEncipherment, cminternal.UsageClientAuth, cminternal.UsageServerAuth},
 				},
 			},
+			a:     someAdmissionRequest,
 			wantE: []*field.Error{},
 		},
 		"Error on csr not having all usages": {
@@ -599,6 +631,7 @@ func TestValidateCertificateRequest(t *testing.T) {
 					Usages:    []cminternal.KeyUsage{cminternal.UsageSigning, cminternal.UsageKeyEncipherment, cminternal.UsageServerAuth, cminternal.UsageClientAuth},
 				},
 			},
+			a: someAdmissionRequest,
 			wantE: []*field.Error{
 				field.Invalid(fldPath.Child("request"), nil, "csr key usages do not match specified usages, these should match if both are set: [[]certmanager.KeyUsage[3] != []certmanager.KeyUsage[4]]"),
 			},
@@ -611,6 +644,7 @@ func TestValidateCertificateRequest(t *testing.T) {
 					Usages:    []cminternal.KeyUsage{cminternal.UsageSigning, cminternal.UsageKeyEncipherment},
 				},
 			},
+			a: someAdmissionRequest,
 			wantE: []*field.Error{
 				field.Invalid(fldPath.Child("request"), nil, "csr key usages do not match specified usages, these should match if both are set: [[]certmanager.KeyUsage[4] != []certmanager.KeyUsage[2]]"),
 			},
@@ -624,6 +658,7 @@ func TestValidateCertificateRequest(t *testing.T) {
 					Usages:    []cminternal.KeyUsage{cminternal.UsageAny, cminternal.UsageSigning, cminternal.UsageKeyEncipherment, cminternal.UsageClientAuth, cminternal.UsageServerAuth},
 				},
 			},
+			a:     someAdmissionRequest,
 			wantE: []*field.Error{},
 		},
 		"CertificateRequest with single Approved=true condition, shouldn't error": {
@@ -643,6 +678,7 @@ func TestValidateCertificateRequest(t *testing.T) {
 					},
 				},
 			},
+			a:     someAdmissionRequest,
 			wantE: []*field.Error{},
 		},
 		"CertificateRequest with single Denied=true condition, shouldn't error": {
@@ -662,6 +698,7 @@ func TestValidateCertificateRequest(t *testing.T) {
 					},
 				},
 			},
+			a:     someAdmissionRequest,
 			wantE: []*field.Error{},
 		},
 		"CertificateRequest with single Approved=false condition, should error": {
@@ -682,6 +719,7 @@ func TestValidateCertificateRequest(t *testing.T) {
 					},
 				},
 			},
+			a: someAdmissionRequest,
 			wantE: []*field.Error{
 				field.Invalid(fldPathConditions.Child("Approved"), nil,
 					`"Approved" condition may only be set to True`),
@@ -705,6 +743,7 @@ func TestValidateCertificateRequest(t *testing.T) {
 					},
 				},
 			},
+			a: someAdmissionRequest,
 			wantE: []*field.Error{
 				field.Invalid(fldPathConditions.Child("Denied"), nil,
 					`"Denied" condition may only be set to True`),
@@ -733,6 +772,7 @@ func TestValidateCertificateRequest(t *testing.T) {
 					},
 				},
 			},
+			a: someAdmissionRequest,
 			wantE: []*field.Error{
 				field.Invalid(field.NewPath("status", "conditions", "Approved"), nil,
 					`"Approved" condition may only be set to True`),
@@ -764,6 +804,7 @@ func TestValidateCertificateRequest(t *testing.T) {
 					},
 				},
 			},
+			a: someAdmissionRequest,
 			wantE: []*field.Error{
 				field.Forbidden(fldPathConditions, "both 'Denied' and 'Approved' conditions cannot coexist"),
 			},
@@ -791,6 +832,7 @@ func TestValidateCertificateRequest(t *testing.T) {
 					},
 				},
 			},
+			a: someAdmissionRequest,
 			wantE: []*field.Error{
 				field.Forbidden(fldPathConditions, `multiple "Approved" conditions present`),
 			},
@@ -818,20 +860,22 @@ func TestValidateCertificateRequest(t *testing.T) {
 					},
 				},
 			},
+			a: someAdmissionRequest,
 			wantE: []*field.Error{
 				field.Forbidden(fldPathConditions, `multiple "Denied" conditions present`),
 			},
 		},
 		"CertificateRequest  against v1alpha2 API should throw a warning": {
 			cr: &cminternal.CertificateRequest{
-				TypeMeta: metav1.TypeMeta{
-					APIVersion: cmapiv1alpha2.SchemeGroupVersion.String(),
-					Kind:       "CertificateRequest",
-				},
 				Spec: cminternal.CertificateRequestSpec{
 					Request:   mustGenerateCSR(t, gen.Certificate("spec", gen.SetCertificateDNSNames("example.com"), gen.SetCertificateKeyUsages(cmapi.UsageAny), gen.SetCertificateIsCA(true))),
 					IssuerRef: validIssuerRef,
 				},
+			},
+			a: &admissionv1.AdmissionRequest{
+				Kind: metav1.GroupVersionKind{Group: "cert-manager.io",
+					Version: "v1alpha2",
+					Kind:    "CertificateRequest"},
 			},
 			wantW: validation.WarningList{
 				fmt.Sprintf(deprecationMessageTemplate,
@@ -853,6 +897,11 @@ func TestValidateCertificateRequest(t *testing.T) {
 					IssuerRef: validIssuerRef,
 				},
 			},
+			a: &admissionv1.AdmissionRequest{
+				Kind: metav1.GroupVersionKind{Group: "cert-manager.io",
+					Version: "v1alpha3",
+					Kind:    "CertificateRequest"},
+			},
 			wantW: validation.WarningList{
 				fmt.Sprintf(deprecationMessageTemplate,
 					cmapiv1alpha3.SchemeGroupVersion.String(),
@@ -864,16 +913,17 @@ func TestValidateCertificateRequest(t *testing.T) {
 		},
 		"CertificateRequest  against v1beta1 API should throw a warning": {
 			cr: &cminternal.CertificateRequest{
-				TypeMeta: metav1.TypeMeta{
-					APIVersion: cmapiv1beta1.SchemeGroupVersion.String(),
-					Kind:       "CertificateRequest",
-				},
 				Spec: cminternal.CertificateRequestSpec{
 					Request:   mustGenerateCSR(t, gen.Certificate("spec", gen.SetCertificateDNSNames("example.com"), gen.SetCertificateKeyUsages(cmapi.UsageAny), gen.SetCertificateIsCA(true))),
 					IssuerRef: validIssuerRef,
 					IsCA:      true,
 					Usages:    []cminternal.KeyUsage{cminternal.UsageAny},
 				},
+			},
+			a: &admissionv1.AdmissionRequest{
+				Kind: metav1.GroupVersionKind{Group: "cert-manager.io",
+					Version: "v1beta1",
+					Kind:    "CertificateRequest"},
 			},
 			wantW: validation.WarningList{
 				fmt.Sprintf(deprecationMessageTemplate,
@@ -887,7 +937,7 @@ func TestValidateCertificateRequest(t *testing.T) {
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			gotE, gotW := ValidateCertificateRequest(nil, test.cr)
+			gotE, gotW := ValidateCertificateRequest(test.a, test.cr)
 			for i := range gotE {
 				if gotE[i].Type != field.ErrorTypeForbidden {
 					// filter out the value so it does not print the full CSR in tests
