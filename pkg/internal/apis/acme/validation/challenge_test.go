@@ -17,16 +17,28 @@ limitations under the License.
 package validation
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 
+	cmacmev1 "github.com/jetstack/cert-manager/pkg/apis/acme/v1"
+	cmacmev1alpha2 "github.com/jetstack/cert-manager/pkg/apis/acme/v1alpha2"
+	cmacmev1alpha3 "github.com/jetstack/cert-manager/pkg/apis/acme/v1alpha3"
+	cmacmev1beta1 "github.com/jetstack/cert-manager/pkg/apis/acme/v1beta1"
 	"github.com/jetstack/cert-manager/pkg/internal/api/validation"
 	cmacme "github.com/jetstack/cert-manager/pkg/internal/apis/acme"
 )
 
 func TestValidateChallengeUpdate(t *testing.T) {
+	baseChal := &cmacme.Challenge{
+		Spec: cmacme.ChallengeSpec{
+			URL: "testurl",
+		},
+	}
+
 	scenarios := map[string]struct {
 		old, new *cmacme.Challenge
 		errs     []*field.Error
@@ -66,10 +78,148 @@ func TestValidateChallengeUpdate(t *testing.T) {
 				},
 			},
 		},
+		"challenge updated to v1alpha2 version": {
+			old: baseChal,
+			new: &cmacme.Challenge{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: cmacmev1alpha2.SchemeGroupVersion.String(),
+					Kind:       "Challenge",
+				},
+				Spec: cmacme.ChallengeSpec{
+					URL: "testurl",
+				},
+			},
+			warnings: validation.WarningList{
+				fmt.Sprintf(deprecationMessageTemplate,
+					cmacmev1alpha2.SchemeGroupVersion.String(),
+					"Challenge",
+					cmacmev1.SchemeGroupVersion.String(),
+					"Challenge"),
+			},
+		},
+		"challenge updated to v1alpha3 version": {
+			old: baseChal,
+			new: &cmacme.Challenge{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: cmacmev1alpha3.SchemeGroupVersion.String(),
+					Kind:       "Challenge",
+				},
+				Spec: cmacme.ChallengeSpec{
+					URL: "testurl",
+				},
+			},
+			warnings: validation.WarningList{
+				fmt.Sprintf(deprecationMessageTemplate,
+					cmacmev1alpha3.SchemeGroupVersion.String(),
+					"Challenge",
+					cmacmev1.SchemeGroupVersion.String(),
+					"Challenge"),
+			},
+		},
+		"challenge updated to v1beta1 version": {
+			old: baseChal,
+			new: &cmacme.Challenge{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: cmacmev1beta1.SchemeGroupVersion.String(),
+					Kind:       "Challenge",
+				},
+				Spec: cmacme.ChallengeSpec{
+					URL: "testurl",
+				},
+			},
+			warnings: validation.WarningList{
+				fmt.Sprintf(deprecationMessageTemplate,
+					cmacmev1beta1.SchemeGroupVersion.String(),
+					"Challenge",
+					cmacmev1.SchemeGroupVersion.String(),
+					"Challenge"),
+			},
+		},
 	}
 	for n, s := range scenarios {
 		t.Run(n, func(t *testing.T) {
 			errs, warnings := ValidateChallengeUpdate(nil, s.old, s.new)
+			if len(errs) != len(s.errs) {
+				t.Errorf("Expected %v but got %v", s.errs, errs)
+				return
+			}
+			for i, e := range errs {
+				expectedErr := s.errs[i]
+				if !reflect.DeepEqual(e, expectedErr) {
+					t.Errorf("Expected errors %v but got %v", expectedErr, e)
+				}
+			}
+			if !reflect.DeepEqual(warnings, s.warnings) {
+				t.Errorf("Expected warnings %+#v but got %+#v", s.warnings, warnings)
+			}
+		})
+	}
+}
+
+func TestValidateChallenge(t *testing.T) {
+	scenarios := map[string]struct {
+		chal     *cmacme.Challenge
+		errs     []*field.Error
+		warnings validation.WarningList
+	}{
+		"challenge updated to v1alpha2 version": {
+			chal: &cmacme.Challenge{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: cmacmev1alpha2.SchemeGroupVersion.String(),
+					Kind:       "Challenge",
+				},
+				Spec: cmacme.ChallengeSpec{
+					URL: "testurl",
+				},
+			},
+			warnings: validation.WarningList{
+				fmt.Sprintf(deprecationMessageTemplate,
+					cmacmev1alpha2.SchemeGroupVersion.String(),
+					"Challenge",
+					cmacmev1.SchemeGroupVersion.String(),
+					"Challenge"),
+			},
+		},
+		"challenge updated to v1alpha3 version": {
+			chal: &cmacme.Challenge{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: cmacmev1alpha3.SchemeGroupVersion.String(),
+					Kind:       "Challenge",
+				},
+				Spec: cmacme.ChallengeSpec{
+					URL: "testurl",
+				},
+			},
+			warnings: validation.WarningList{
+				fmt.Sprintf(deprecationMessageTemplate,
+					cmacmev1alpha3.SchemeGroupVersion.String(),
+					"Challenge",
+					cmacmev1.SchemeGroupVersion.String(),
+					"Challenge"),
+			},
+		},
+		"challenge updated to v1beta1 version": {
+			chal: &cmacme.Challenge{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: cmacmev1beta1.SchemeGroupVersion.String(),
+					Kind:       "Challenge",
+				},
+				Spec: cmacme.ChallengeSpec{
+					URL: "testurl",
+				},
+			},
+			warnings: validation.WarningList{
+				fmt.Sprintf(deprecationMessageTemplate,
+					cmacmev1beta1.SchemeGroupVersion.String(),
+					"Challenge",
+					cmacmev1.SchemeGroupVersion.String(),
+					"Challenge"),
+			},
+		},
+	}
+	for n, s := range scenarios {
+		t.Run(n, func(t *testing.T) {
+			errs, warnings := ValidateChallenge(nil, s.chal)
 			if len(errs) != len(s.errs) {
 				t.Errorf("Expected %v but got %v", s.errs, errs)
 				return

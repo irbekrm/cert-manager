@@ -35,11 +35,17 @@ func ValidateChallengeUpdate(_ *admissionv1.AdmissionRequest, oldObj, newObj run
 		return nil, nil
 	}
 
-	var warnings validation.WarningList
 	el := field.ErrorList{}
 	if !reflect.DeepEqual(old.Spec, new.Spec) {
 		el = append(el, field.Forbidden(field.NewPath("spec"), "challenge spec is immutable after creation"))
 	}
-
+	warnings := validateAPIVersion(new.TypeMeta)
 	return el, warnings
+}
+
+func ValidateChallenge(_ *admissionv1.AdmissionRequest, obj runtime.Object) (field.ErrorList, validation.WarningList) {
+	chal := obj.(*cmacme.Challenge)
+
+	warnings := validateAPIVersion(chal.TypeMeta)
+	return nil, warnings
 }
