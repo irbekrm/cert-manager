@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"testing"
 
+	admissionv1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 
@@ -38,9 +39,17 @@ func TestValidateChallengeUpdate(t *testing.T) {
 			URL: "testurl",
 		},
 	}
+	someAdmissionRequest := &admissionv1.AdmissionRequest{
+		Kind: metav1.GroupVersionKind{
+			Group:   "test",
+			Kind:    "test",
+			Version: "test",
+		},
+	}
 
 	scenarios := map[string]struct {
 		old, new *cmacme.Challenge
+		a        *admissionv1.AdmissionRequest
 		errs     []*field.Error
 		warnings validation.WarningList
 	}{
@@ -50,6 +59,7 @@ func TestValidateChallengeUpdate(t *testing.T) {
 					URL: "testurl",
 				},
 			},
+			a: someAdmissionRequest,
 		},
 		"disallow updating challenge spec": {
 			old: &cmacme.Challenge{
@@ -62,6 +72,7 @@ func TestValidateChallengeUpdate(t *testing.T) {
 					URL: "newtesturl",
 				},
 			},
+			a: someAdmissionRequest,
 			errs: []*field.Error{
 				field.Forbidden(field.NewPath("spec"), "challenge spec is immutable after creation"),
 			},
@@ -77,17 +88,19 @@ func TestValidateChallengeUpdate(t *testing.T) {
 					URL: "testurl",
 				},
 			},
+			a: someAdmissionRequest,
 		},
 		"challenge updated to v1alpha2 version": {
 			old: baseChal,
 			new: &cmacme.Challenge{
-				TypeMeta: metav1.TypeMeta{
-					APIVersion: cmacmev1alpha2.SchemeGroupVersion.String(),
-					Kind:       "Challenge",
-				},
 				Spec: cmacme.ChallengeSpec{
 					URL: "testurl",
 				},
+			},
+			a: &admissionv1.AdmissionRequest{
+				Kind: metav1.GroupVersionKind{Group: "acme.cert-manager.io",
+					Version: "v1alpha2",
+					Kind:    "Challenge"},
 			},
 			warnings: validation.WarningList{
 				fmt.Sprintf(deprecationMessageTemplate,
@@ -100,13 +113,14 @@ func TestValidateChallengeUpdate(t *testing.T) {
 		"challenge updated to v1alpha3 version": {
 			old: baseChal,
 			new: &cmacme.Challenge{
-				TypeMeta: metav1.TypeMeta{
-					APIVersion: cmacmev1alpha3.SchemeGroupVersion.String(),
-					Kind:       "Challenge",
-				},
 				Spec: cmacme.ChallengeSpec{
 					URL: "testurl",
 				},
+			},
+			a: &admissionv1.AdmissionRequest{
+				Kind: metav1.GroupVersionKind{Group: "acme.cert-manager.io",
+					Version: "v1alpha3",
+					Kind:    "Challenge"},
 			},
 			warnings: validation.WarningList{
 				fmt.Sprintf(deprecationMessageTemplate,
@@ -119,13 +133,14 @@ func TestValidateChallengeUpdate(t *testing.T) {
 		"challenge updated to v1beta1 version": {
 			old: baseChal,
 			new: &cmacme.Challenge{
-				TypeMeta: metav1.TypeMeta{
-					APIVersion: cmacmev1beta1.SchemeGroupVersion.String(),
-					Kind:       "Challenge",
-				},
 				Spec: cmacme.ChallengeSpec{
 					URL: "testurl",
 				},
+			},
+			a: &admissionv1.AdmissionRequest{
+				Kind: metav1.GroupVersionKind{Group: "acme.cert-manager.io",
+					Version: "v1beta1",
+					Kind:    "Challenge"},
 			},
 			warnings: validation.WarningList{
 				fmt.Sprintf(deprecationMessageTemplate,
@@ -138,7 +153,7 @@ func TestValidateChallengeUpdate(t *testing.T) {
 	}
 	for n, s := range scenarios {
 		t.Run(n, func(t *testing.T) {
-			errs, warnings := ValidateChallengeUpdate(nil, s.old, s.new)
+			errs, warnings := ValidateChallengeUpdate(s.a, s.old, s.new)
 			if len(errs) != len(s.errs) {
 				t.Errorf("Expected %v but got %v", s.errs, errs)
 				return
@@ -159,18 +174,20 @@ func TestValidateChallengeUpdate(t *testing.T) {
 func TestValidateChallenge(t *testing.T) {
 	scenarios := map[string]struct {
 		chal     *cmacme.Challenge
+		a        *admissionv1.AdmissionRequest
 		errs     []*field.Error
 		warnings validation.WarningList
 	}{
 		"challenge updated to v1alpha2 version": {
 			chal: &cmacme.Challenge{
-				TypeMeta: metav1.TypeMeta{
-					APIVersion: cmacmev1alpha2.SchemeGroupVersion.String(),
-					Kind:       "Challenge",
-				},
 				Spec: cmacme.ChallengeSpec{
 					URL: "testurl",
 				},
+			},
+			a: &admissionv1.AdmissionRequest{
+				Kind: metav1.GroupVersionKind{Group: "acme.cert-manager.io",
+					Version: "v1alpha2",
+					Kind:    "Challenge"},
 			},
 			warnings: validation.WarningList{
 				fmt.Sprintf(deprecationMessageTemplate,
@@ -182,13 +199,14 @@ func TestValidateChallenge(t *testing.T) {
 		},
 		"challenge updated to v1alpha3 version": {
 			chal: &cmacme.Challenge{
-				TypeMeta: metav1.TypeMeta{
-					APIVersion: cmacmev1alpha3.SchemeGroupVersion.String(),
-					Kind:       "Challenge",
-				},
 				Spec: cmacme.ChallengeSpec{
 					URL: "testurl",
 				},
+			},
+			a: &admissionv1.AdmissionRequest{
+				Kind: metav1.GroupVersionKind{Group: "acme.cert-manager.io",
+					Version: "v1alpha3",
+					Kind:    "Challenge"},
 			},
 			warnings: validation.WarningList{
 				fmt.Sprintf(deprecationMessageTemplate,
@@ -200,13 +218,14 @@ func TestValidateChallenge(t *testing.T) {
 		},
 		"challenge updated to v1beta1 version": {
 			chal: &cmacme.Challenge{
-				TypeMeta: metav1.TypeMeta{
-					APIVersion: cmacmev1beta1.SchemeGroupVersion.String(),
-					Kind:       "Challenge",
-				},
 				Spec: cmacme.ChallengeSpec{
 					URL: "testurl",
 				},
+			},
+			a: &admissionv1.AdmissionRequest{
+				Kind: metav1.GroupVersionKind{Group: "acme.cert-manager.io",
+					Version: "v1beta1",
+					Kind:    "Challenge"},
 			},
 			warnings: validation.WarningList{
 				fmt.Sprintf(deprecationMessageTemplate,
@@ -219,7 +238,7 @@ func TestValidateChallenge(t *testing.T) {
 	}
 	for n, s := range scenarios {
 		t.Run(n, func(t *testing.T) {
-			errs, warnings := ValidateChallenge(nil, s.chal)
+			errs, warnings := ValidateChallenge(s.a, s.chal)
 			if len(errs) != len(s.errs) {
 				t.Errorf("Expected %v but got %v", s.errs, errs)
 				return

@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"testing"
 
+	admissionv1 "k8s.io/api/admission/v1"
 	"k8s.io/utils/pointer"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -42,6 +43,16 @@ const (
 	testValueOptionTwo = "two"
 )
 
+var (
+	someAdmissionRequest = &admissionv1.AdmissionRequest{
+		Kind: metav1.GroupVersionKind{
+			Group:   "test",
+			Kind:    "test",
+			Version: "test",
+		},
+	}
+)
+
 // testImmutableOrderField will test that the field at path fldPath does
 // not allow changes after being set, but does allow changes if the old field
 // is not set.
@@ -55,7 +66,7 @@ func testImmutableOrderField(t *testing.T, fldPath *field.Path, setter func(*cma
 		new := &cmacme.Order{}
 		setter(old, testValueOptionOne)
 		setter(new, testValueOptionTwo)
-		errs, warnings := ValidateOrderUpdate(nil, old, new)
+		errs, warnings := ValidateOrderUpdate(someAdmissionRequest, old, new)
 		if len(errs) != len(expectedErrs) {
 			t.Errorf("Expected errors %v but got %v", expectedErrs, errs)
 			return
@@ -77,7 +88,7 @@ func testImmutableOrderField(t *testing.T, fldPath *field.Path, setter func(*cma
 		new := &cmacme.Order{}
 		setter(old, testValueNone)
 		setter(new, testValueOptionOne)
-		errs, warnings := ValidateOrderUpdate(nil, old, new)
+		errs, warnings := ValidateOrderUpdate(someAdmissionRequest, old, new)
 		if len(errs) != len(expectedErrs) {
 			t.Errorf("Expected errors %v but got %v", expectedErrs, errs)
 			return
@@ -220,6 +231,7 @@ func TestValidateOrderUpdate(t *testing.T) {
 
 	scenarios := map[string]struct {
 		old, new *cmacme.Order
+		a        *admissionv1.AdmissionRequest
 		errs     []*field.Error
 		warnings validation.WarningList
 	}{
@@ -229,17 +241,19 @@ func TestValidateOrderUpdate(t *testing.T) {
 					Request: []byte("testing"),
 				},
 			},
+			a: someAdmissionRequest,
 		},
 		"Order updated to v1alpha2 version": {
 			old: baseOrder,
 			new: &cmacme.Order{
-				TypeMeta: metav1.TypeMeta{
-					APIVersion: cmacmev1alpha2.SchemeGroupVersion.String(),
-					Kind:       "Order",
-				},
 				Spec: cmacme.OrderSpec{
 					Request: []byte("testing"),
 				},
+			},
+			a: &admissionv1.AdmissionRequest{
+				Kind: metav1.GroupVersionKind{Group: "acme.cert-manager.io",
+					Version: "v1alpha2",
+					Kind:    "Order"},
 			},
 			warnings: validation.WarningList{
 				fmt.Sprintf(deprecationMessageTemplate,
@@ -252,13 +266,14 @@ func TestValidateOrderUpdate(t *testing.T) {
 		"Order updated to v1alpha3 version": {
 			old: baseOrder,
 			new: &cmacme.Order{
-				TypeMeta: metav1.TypeMeta{
-					APIVersion: cmacmev1alpha3.SchemeGroupVersion.String(),
-					Kind:       "Order",
-				},
 				Spec: cmacme.OrderSpec{
 					Request: []byte("testing"),
 				},
+			},
+			a: &admissionv1.AdmissionRequest{
+				Kind: metav1.GroupVersionKind{Group: "acme.cert-manager.io",
+					Version: "v1alpha3",
+					Kind:    "Order"},
 			},
 			warnings: validation.WarningList{
 				fmt.Sprintf(deprecationMessageTemplate,
@@ -271,13 +286,14 @@ func TestValidateOrderUpdate(t *testing.T) {
 		"Order updated to v1beta1 version": {
 			old: baseOrder,
 			new: &cmacme.Order{
-				TypeMeta: metav1.TypeMeta{
-					APIVersion: cmacmev1beta1.SchemeGroupVersion.String(),
-					Kind:       "Order",
-				},
 				Spec: cmacme.OrderSpec{
 					Request: []byte("testing"),
 				},
+			},
+			a: &admissionv1.AdmissionRequest{
+				Kind: metav1.GroupVersionKind{Group: "acme.cert-manager.io",
+					Version: "v1beta1",
+					Kind:    "Order"},
 			},
 			warnings: validation.WarningList{
 				fmt.Sprintf(deprecationMessageTemplate,
@@ -290,7 +306,7 @@ func TestValidateOrderUpdate(t *testing.T) {
 	}
 	for n, s := range scenarios {
 		t.Run(n, func(t *testing.T) {
-			errs, warnings := ValidateOrderUpdate(nil, s.old, s.new)
+			errs, warnings := ValidateOrderUpdate(s.a, s.old, s.new)
 			if len(errs) != len(s.errs) {
 				t.Errorf("Expected %v but got %v", s.errs, errs)
 				return
@@ -311,18 +327,20 @@ func TestValidateOrderUpdate(t *testing.T) {
 func TestValidateOrder(t *testing.T) {
 	scenarios := map[string]struct {
 		order    *cmacme.Order
+		a        *admissionv1.AdmissionRequest
 		errs     []*field.Error
 		warnings validation.WarningList
 	}{
 		"Order updated to v1alpha2 version": {
 			order: &cmacme.Order{
-				TypeMeta: metav1.TypeMeta{
-					APIVersion: cmacmev1alpha2.SchemeGroupVersion.String(),
-					Kind:       "Order",
-				},
 				Spec: cmacme.OrderSpec{
 					Request: []byte("testing"),
 				},
+			},
+			a: &admissionv1.AdmissionRequest{
+				Kind: metav1.GroupVersionKind{Group: "acme.cert-manager.io",
+					Version: "v1alpha2",
+					Kind:    "Order"},
 			},
 			warnings: validation.WarningList{
 				fmt.Sprintf(deprecationMessageTemplate,
@@ -334,13 +352,14 @@ func TestValidateOrder(t *testing.T) {
 		},
 		"Order updated to v1alpha3 version": {
 			order: &cmacme.Order{
-				TypeMeta: metav1.TypeMeta{
-					APIVersion: cmacmev1alpha3.SchemeGroupVersion.String(),
-					Kind:       "Order",
-				},
 				Spec: cmacme.OrderSpec{
 					Request: []byte("testing"),
 				},
+			},
+			a: &admissionv1.AdmissionRequest{
+				Kind: metav1.GroupVersionKind{Group: "acme.cert-manager.io",
+					Version: "v1alpha3",
+					Kind:    "Order"},
 			},
 			warnings: validation.WarningList{
 				fmt.Sprintf(deprecationMessageTemplate,
@@ -352,13 +371,14 @@ func TestValidateOrder(t *testing.T) {
 		},
 		"Order updated to v1beta1 version": {
 			order: &cmacme.Order{
-				TypeMeta: metav1.TypeMeta{
-					APIVersion: cmacmev1beta1.SchemeGroupVersion.String(),
-					Kind:       "Order",
-				},
 				Spec: cmacme.OrderSpec{
 					Request: []byte("testing"),
 				},
+			},
+			a: &admissionv1.AdmissionRequest{
+				Kind: metav1.GroupVersionKind{Group: "acme.cert-manager.io",
+					Version: "v1beta1",
+					Kind:    "Order"},
 			},
 			warnings: validation.WarningList{
 				fmt.Sprintf(deprecationMessageTemplate,
@@ -371,7 +391,7 @@ func TestValidateOrder(t *testing.T) {
 	}
 	for n, s := range scenarios {
 		t.Run(n, func(t *testing.T) {
-			errs, warnings := ValidateOrder(nil, s.order)
+			errs, warnings := ValidateOrder(s.a, s.order)
 			if len(errs) != len(s.errs) {
 				t.Errorf("Expected %v but got %v", s.errs, errs)
 				return

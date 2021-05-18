@@ -41,11 +41,12 @@ var (
 	deprecationMessageTemplate = "%s %s is deprecated in v1.4+, unavailable in v1.6+; use %v %s"
 )
 
-func validateAPIVersion(meta metav1.TypeMeta) validation.WarningList {
-	oldV := meta.APIVersion
-	kind := meta.Kind
-	if newV, ok := deprecatedAPIs[oldV]; ok {
-		w := fmt.Sprintf(deprecationMessageTemplate, oldV, kind, newV, kind)
+func validateAPIVersion(gvk metav1.GroupVersionKind) validation.WarningList {
+	// There might be a smarter way to get GroupVersion
+	gv := fmt.Sprintf("%s/%s", gvk.Group, gvk.Version)
+	kind := gvk.Kind
+	if newV, ok := deprecatedAPIs[gv]; ok {
+		w := fmt.Sprintf(deprecationMessageTemplate, gv, kind, newV, kind)
 		return validation.WarningList{w}
 	}
 	return nil
