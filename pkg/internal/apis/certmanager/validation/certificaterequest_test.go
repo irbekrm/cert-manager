@@ -19,6 +19,7 @@ package validation
 import (
 	"bytes"
 	"encoding/pem"
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -28,6 +29,9 @@ import (
 	cmapi "github.com/jetstack/cert-manager/pkg/apis/certmanager/v1"
 	"github.com/jetstack/cert-manager/pkg/internal/api/validation"
 	cminternal "github.com/jetstack/cert-manager/pkg/internal/apis/certmanager"
+	cmapiv1alpha2 "github.com/jetstack/cert-manager/pkg/internal/apis/certmanager/v1alpha2"
+	cmapiv1alpha3 "github.com/jetstack/cert-manager/pkg/internal/apis/certmanager/v1alpha3"
+	cmapiv1beta1 "github.com/jetstack/cert-manager/pkg/internal/apis/certmanager/v1beta1"
 	cminternalmeta "github.com/jetstack/cert-manager/pkg/internal/apis/meta"
 	utilpki "github.com/jetstack/cert-manager/pkg/util/pki"
 	"github.com/jetstack/cert-manager/test/unit/gen"
@@ -419,6 +423,81 @@ func TestValidateCertificateRequestUpdate(t *testing.T) {
 				field.Forbidden(fldPathConditions, "'Denied' condition may not be modified once set"),
 			},
 		},
+		"CertificateRequest  against v1alpha2 API should throw a warning": {
+			oldCR: &cminternal.CertificateRequest{
+				Spec: cminternal.CertificateRequestSpec{
+					Request:   baseRequest,
+					IssuerRef: validIssuerRef,
+				},
+			},
+			newCR: &cminternal.CertificateRequest{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: cmapiv1alpha2.SchemeGroupVersion.String(),
+					Kind:       "CertificateRequest",
+				},
+				Spec: cminternal.CertificateRequestSpec{
+					Request:   baseRequest,
+					IssuerRef: validIssuerRef,
+				},
+			},
+			wantW: validation.WarningList{
+				fmt.Sprintf(deprecationMessageTemplate,
+					cmapiv1alpha2.SchemeGroupVersion.String(),
+					"CertificateRequest",
+					cmapi.SchemeGroupVersion.String(),
+					"CertificateRequest"),
+			},
+		},
+		"CertificateRequest  against v1alpha3 API should throw a warning": {
+			oldCR: &cminternal.CertificateRequest{
+				Spec: cminternal.CertificateRequestSpec{
+					Request:   baseRequest,
+					IssuerRef: validIssuerRef,
+				},
+			},
+			newCR: &cminternal.CertificateRequest{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: cmapiv1alpha3.SchemeGroupVersion.String(),
+					Kind:       "CertificateRequest",
+				},
+				Spec: cminternal.CertificateRequestSpec{
+					Request:   baseRequest,
+					IssuerRef: validIssuerRef,
+				},
+			},
+			wantW: validation.WarningList{
+				fmt.Sprintf(deprecationMessageTemplate,
+					cmapiv1alpha3.SchemeGroupVersion.String(),
+					"CertificateRequest",
+					cmapi.SchemeGroupVersion.String(),
+					"CertificateRequest"),
+			},
+		},
+		"CertificateRequest  against v1beta1 API should throw a warning": {
+			oldCR: &cminternal.CertificateRequest{
+				Spec: cminternal.CertificateRequestSpec{
+					Request:   baseRequest,
+					IssuerRef: validIssuerRef,
+				},
+			},
+			newCR: &cminternal.CertificateRequest{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: cmapiv1beta1.SchemeGroupVersion.String(),
+					Kind:       "CertificateRequest",
+				},
+				Spec: cminternal.CertificateRequestSpec{
+					Request:   baseRequest,
+					IssuerRef: validIssuerRef,
+				},
+			},
+			wantW: validation.WarningList{
+				fmt.Sprintf(deprecationMessageTemplate,
+					cmapiv1beta1.SchemeGroupVersion.String(),
+					"CertificateRequest",
+					cmapi.SchemeGroupVersion.String(),
+					"CertificateRequest"),
+			},
+		},
 	}
 
 	for name, test := range tests {
@@ -742,6 +821,68 @@ func TestValidateCertificateRequest(t *testing.T) {
 			wantE: []*field.Error{
 				field.Forbidden(fldPathConditions, `multiple "Denied" conditions present`),
 			},
+		},
+		"CertificateRequest  against v1alpha2 API should throw a warning": {
+			cr: &cminternal.CertificateRequest{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: cmapiv1alpha2.SchemeGroupVersion.String(),
+					Kind:       "CertificateRequest",
+				},
+				Spec: cminternal.CertificateRequestSpec{
+					Request:   mustGenerateCSR(t, gen.Certificate("spec", gen.SetCertificateDNSNames("example.com"), gen.SetCertificateKeyUsages(cmapi.UsageAny), gen.SetCertificateIsCA(true))),
+					IssuerRef: validIssuerRef,
+				},
+			},
+			wantW: validation.WarningList{
+				fmt.Sprintf(deprecationMessageTemplate,
+					cmapiv1alpha2.SchemeGroupVersion.String(),
+					"CertificateRequest",
+					cmapi.SchemeGroupVersion.String(),
+					"CertificateRequest"),
+			},
+			wantE: field.ErrorList{},
+		},
+		"CertificateRequest  against v1alpha3 API should throw a warning": {
+			cr: &cminternal.CertificateRequest{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: cmapiv1alpha3.SchemeGroupVersion.String(),
+					Kind:       "CertificateRequest",
+				},
+				Spec: cminternal.CertificateRequestSpec{
+					Request:   mustGenerateCSR(t, gen.Certificate("spec", gen.SetCertificateDNSNames("example.com"), gen.SetCertificateKeyUsages(cmapi.UsageAny), gen.SetCertificateIsCA(true))),
+					IssuerRef: validIssuerRef,
+				},
+			},
+			wantW: validation.WarningList{
+				fmt.Sprintf(deprecationMessageTemplate,
+					cmapiv1alpha3.SchemeGroupVersion.String(),
+					"CertificateRequest",
+					cmapi.SchemeGroupVersion.String(),
+					"CertificateRequest"),
+			},
+			wantE: field.ErrorList{},
+		},
+		"CertificateRequest  against v1beta1 API should throw a warning": {
+			cr: &cminternal.CertificateRequest{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: cmapiv1beta1.SchemeGroupVersion.String(),
+					Kind:       "CertificateRequest",
+				},
+				Spec: cminternal.CertificateRequestSpec{
+					Request:   mustGenerateCSR(t, gen.Certificate("spec", gen.SetCertificateDNSNames("example.com"), gen.SetCertificateKeyUsages(cmapi.UsageAny), gen.SetCertificateIsCA(true))),
+					IssuerRef: validIssuerRef,
+					IsCA:      true,
+					Usages:    []cminternal.KeyUsage{cminternal.UsageAny},
+				},
+			},
+			wantW: validation.WarningList{
+				fmt.Sprintf(deprecationMessageTemplate,
+					cmapiv1beta1.SchemeGroupVersion.String(),
+					"CertificateRequest",
+					cmapi.SchemeGroupVersion.String(),
+					"CertificateRequest"),
+			},
+			wantE: field.ErrorList{},
 		},
 	}
 	for name, test := range tests {

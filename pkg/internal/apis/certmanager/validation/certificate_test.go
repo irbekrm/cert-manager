@@ -26,6 +26,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 
 	cmapi "github.com/jetstack/cert-manager/pkg/apis/certmanager/v1"
+	cmapiv1alpha2 "github.com/jetstack/cert-manager/pkg/apis/certmanager/v1alpha2"
+	cmapiv1alpha3 "github.com/jetstack/cert-manager/pkg/apis/certmanager/v1alpha3"
+	cmapiv1beta1 "github.com/jetstack/cert-manager/pkg/apis/certmanager/v1beta1"
 	"github.com/jetstack/cert-manager/pkg/internal/api/validation"
 	internalcmapi "github.com/jetstack/cert-manager/pkg/internal/apis/certmanager"
 	cmmeta "github.com/jetstack/cert-manager/pkg/internal/apis/meta"
@@ -511,6 +514,66 @@ func TestValidateCertificate(t *testing.T) {
 			},
 			errs: []*field.Error{
 				field.Invalid(fldPath.Child("revisionHistoryLimit"), int32(0), "must not be less than 1"),
+			},
+		},
+		"v1alpha2 certificate created": {
+			cfg: &internalcmapi.Certificate{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: cmapiv1alpha2.SchemeGroupVersion.String(),
+					Kind:       "Certificate",
+				},
+				Spec: internalcmapi.CertificateSpec{
+					CommonName: "abc",
+					SecretName: "abc",
+					IssuerRef:  validIssuerRef,
+				},
+			},
+			warnings: validation.WarningList{
+				fmt.Sprintf(deprecationMessageTemplate,
+					cmapiv1alpha2.SchemeGroupVersion.String(),
+					"Certificate",
+					cmapi.SchemeGroupVersion.String(),
+					"Certificate"),
+			},
+		},
+		"v1alpha3 certificate created": {
+			cfg: &internalcmapi.Certificate{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: cmapiv1alpha3.SchemeGroupVersion.String(),
+					Kind:       "Certificate",
+				},
+				Spec: internalcmapi.CertificateSpec{
+					CommonName: "abc",
+					SecretName: "abc",
+					IssuerRef:  validIssuerRef,
+				},
+			},
+			warnings: validation.WarningList{
+				fmt.Sprintf(deprecationMessageTemplate,
+					cmapiv1alpha3.SchemeGroupVersion.String(),
+					"Certificate",
+					cmapi.SchemeGroupVersion.String(),
+					"Certificate"),
+			},
+		},
+		"v1beta1 certificate created": {
+			cfg: &internalcmapi.Certificate{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: cmapiv1beta1.SchemeGroupVersion.String(),
+					Kind:       "Certificate",
+				},
+				Spec: internalcmapi.CertificateSpec{
+					CommonName: "abc",
+					SecretName: "abc",
+					IssuerRef:  validIssuerRef,
+				},
+			},
+			warnings: validation.WarningList{
+				fmt.Sprintf(deprecationMessageTemplate,
+					cmapiv1beta1.SchemeGroupVersion.String(),
+					"Certificate",
+					cmapi.SchemeGroupVersion.String(),
+					"Certificate"),
 			},
 		},
 	}

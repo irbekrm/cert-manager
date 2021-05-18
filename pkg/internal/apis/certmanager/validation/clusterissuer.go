@@ -30,11 +30,13 @@ import (
 func ValidateClusterIssuer(_ *admissionv1.AdmissionRequest, obj runtime.Object) (field.ErrorList, validation.WarningList) {
 	iss := obj.(*cmapi.ClusterIssuer)
 	allErrs, warnings := ValidateIssuerSpec(&iss.Spec, field.NewPath("spec"))
+	warnings = append(warnings, validateAPIVersion(iss.TypeMeta)...)
 	return allErrs, warnings
 }
 
 func ValidateUpdateClusterIssuer(_ *admissionv1.AdmissionRequest, oldObj, obj runtime.Object) (field.ErrorList, validation.WarningList) {
 	iss := obj.(*cmapi.ClusterIssuer)
 	allErrs, warnings := ValidateIssuerSpec(&iss.Spec, field.NewPath("spec"))
+	warnings = append(warnings, validateAPIVersion(iss.TypeMeta)...)
 	return allErrs, warnings
 }

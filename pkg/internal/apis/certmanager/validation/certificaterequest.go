@@ -45,7 +45,9 @@ func ValidateCertificateRequest(_ *admissionv1.AdmissionRequest, obj runtime.Obj
 	allErrs = append(allErrs,
 		ValidateCertificateRequestApprovalCondition(cr.Status.Conditions, field.NewPath("status", "conditions"))...)
 
-	return allErrs, nil
+	w := validateAPIVersion(cr.TypeMeta)
+
+	return allErrs, w
 }
 
 func ValidateUpdateCertificateRequest(_ *admissionv1.AdmissionRequest, oldObj, newObj runtime.Object) (field.ErrorList, validation.WarningList) {
@@ -66,8 +68,9 @@ func ValidateUpdateCertificateRequest(_ *admissionv1.AdmissionRequest, oldObj, n
 	if !reflect.DeepEqual(oldCR.Spec, newCR.Spec) {
 		el = append(el, field.Forbidden(field.NewPath("spec"), "cannot change spec after creation"))
 	}
+	w := validateAPIVersion(newCR.TypeMeta)
 
-	return el, nil
+	return el, w
 }
 
 func validateCertificateRequestAnnotations(objA, objB *cmapi.CertificateRequest, fieldPath *field.Path) field.ErrorList {
