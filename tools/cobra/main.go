@@ -30,7 +30,6 @@ import (
 	acmesolvercmd "github.com/jetstack/cert-manager/cmd/acmesolver/app"
 	cainjectorapp "github.com/jetstack/cert-manager/cmd/cainjector/app"
 	controllerapp "github.com/jetstack/cert-manager/cmd/controller/app"
-	ctlcmd "github.com/jetstack/cert-manager/cmd/ctl/cmd"
 	webhookcmd "github.com/jetstack/cert-manager/cmd/webhook/app"
 )
 
@@ -63,7 +62,6 @@ func run(args []string) error {
 	for _, c := range []*cobra.Command{
 		cainjectorapp.NewCommandStartInjectorController(nil, nil, nil),
 		controllerapp.NewCommandStartCertManagerController(nil),
-		ctlcmd.NewCertManagerCtlCommand(nil, nil, nil, nil),
 		webhookcmd.NewServerCommand(nil),
 		acmesolvercmd.NewACMESolverCommand(nil),
 	} {

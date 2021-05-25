@@ -17,20 +17,13 @@ limitations under the License.
 package validation
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 
-	admissionv1 "k8s.io/api/admission/v1"
 	"k8s.io/utils/pointer"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 
-	cmacmev1 "github.com/jetstack/cert-manager/pkg/apis/acme/v1"
-	cmacmev1alpha2 "github.com/jetstack/cert-manager/pkg/apis/acme/v1alpha2"
-	cmacmev1alpha3 "github.com/jetstack/cert-manager/pkg/apis/acme/v1alpha3"
-	cmacmev1beta1 "github.com/jetstack/cert-manager/pkg/apis/acme/v1beta1"
 	"github.com/jetstack/cert-manager/pkg/internal/api/validation"
 	cmacme "github.com/jetstack/cert-manager/pkg/internal/apis/acme"
 )
@@ -41,16 +34,6 @@ const (
 	testValueNone      = ""
 	testValueOptionOne = "one"
 	testValueOptionTwo = "two"
-)
-
-var (
-	someAdmissionRequest = &admissionv1.AdmissionRequest{
-		RequestKind: &metav1.GroupVersionKind{
-			Group:   "test",
-			Kind:    "test",
-			Version: "test",
-		},
-	}
 )
 
 // testImmutableOrderField will test that the field at path fldPath does
@@ -66,7 +49,7 @@ func testImmutableOrderField(t *testing.T, fldPath *field.Path, setter func(*cma
 		new := &cmacme.Order{}
 		setter(old, testValueOptionOne)
 		setter(new, testValueOptionTwo)
-		errs, warnings := ValidateOrderUpdate(someAdmissionRequest, old, new)
+		errs, warnings := ValidateOrderUpdate(nil, old, new)
 		if len(errs) != len(expectedErrs) {
 			t.Errorf("Expected errors %v but got %v", expectedErrs, errs)
 			return
@@ -88,7 +71,7 @@ func testImmutableOrderField(t *testing.T, fldPath *field.Path, setter func(*cma
 		new := &cmacme.Order{}
 		setter(old, testValueNone)
 		setter(new, testValueOptionOne)
-		errs, warnings := ValidateOrderUpdate(someAdmissionRequest, old, new)
+		errs, warnings := ValidateOrderUpdate(nil, old, new)
 		if len(errs) != len(expectedErrs) {
 			t.Errorf("Expected errors %v but got %v", expectedErrs, errs)
 			return
@@ -105,7 +88,7 @@ func testImmutableOrderField(t *testing.T, fldPath *field.Path, setter func(*cma
 	})
 }
 
-func TestValidateOrderUpdate(t *testing.T) {
+func TestValidateCertificateUpdate(t *testing.T) {
 	authorizationsFldPath := field.NewPath("status", "authorizations")
 	challengesFldPath := authorizationsFldPath.Index(0).Child("challenges")
 
@@ -223,15 +206,8 @@ func TestValidateOrderUpdate(t *testing.T) {
 		}
 	})
 
-	baseOrder := &cmacme.Order{
-		Spec: cmacme.OrderSpec{
-			Request: []byte("testing"),
-		},
-	}
-
 	scenarios := map[string]struct {
 		old, new *cmacme.Order
-		a        *admissionv1.AdmissionRequest
 		errs     []*field.Error
 		warnings validation.WarningList
 	}{
@@ -241,157 +217,11 @@ func TestValidateOrderUpdate(t *testing.T) {
 					Request: []byte("testing"),
 				},
 			},
-			a: someAdmissionRequest,
-		},
-		"Order updated to v1alpha2 version": {
-			old: baseOrder,
-			new: &cmacme.Order{
-				Spec: cmacme.OrderSpec{
-					Request: []byte("testing"),
-				},
-			},
-			a: &admissionv1.AdmissionRequest{
-				RequestKind: &metav1.GroupVersionKind{Group: "acme.cert-manager.io",
-					Version: "v1alpha2",
-					Kind:    "Order"},
-			},
-			warnings: validation.WarningList{
-				fmt.Sprintf(deprecationMessageTemplate,
-					cmacmev1alpha2.SchemeGroupVersion.String(),
-					"Order",
-					cmacmev1.SchemeGroupVersion.String(),
-					"Order"),
-			},
-		},
-		"Order updated to v1alpha3 version": {
-			old: baseOrder,
-			new: &cmacme.Order{
-				Spec: cmacme.OrderSpec{
-					Request: []byte("testing"),
-				},
-			},
-			a: &admissionv1.AdmissionRequest{
-				RequestKind: &metav1.GroupVersionKind{Group: "acme.cert-manager.io",
-					Version: "v1alpha3",
-					Kind:    "Order"},
-			},
-			warnings: validation.WarningList{
-				fmt.Sprintf(deprecationMessageTemplate,
-					cmacmev1alpha3.SchemeGroupVersion.String(),
-					"Order",
-					cmacmev1.SchemeGroupVersion.String(),
-					"Order"),
-			},
-		},
-		"Order updated to v1beta1 version": {
-			old: baseOrder,
-			new: &cmacme.Order{
-				Spec: cmacme.OrderSpec{
-					Request: []byte("testing"),
-				},
-			},
-			a: &admissionv1.AdmissionRequest{
-				RequestKind: &metav1.GroupVersionKind{Group: "acme.cert-manager.io",
-					Version: "v1beta1",
-					Kind:    "Order"},
-			},
-			warnings: validation.WarningList{
-				fmt.Sprintf(deprecationMessageTemplate,
-					cmacmev1beta1.SchemeGroupVersion.String(),
-					"Order",
-					cmacmev1.SchemeGroupVersion.String(),
-					"Order"),
-			},
 		},
 	}
 	for n, s := range scenarios {
 		t.Run(n, func(t *testing.T) {
-			errs, warnings := ValidateOrderUpdate(s.a, s.old, s.new)
-			if len(errs) != len(s.errs) {
-				t.Errorf("Expected %v but got %v", s.errs, errs)
-				return
-			}
-			for i, e := range errs {
-				expectedErr := s.errs[i]
-				if !reflect.DeepEqual(e, expectedErr) {
-					t.Errorf("Expected errors %v but got %v", expectedErr, e)
-				}
-			}
-			if !reflect.DeepEqual(warnings, s.warnings) {
-				t.Errorf("Expected warnings %+#v but got %+#v", s.warnings, warnings)
-			}
-		})
-	}
-}
-
-func TestValidateOrder(t *testing.T) {
-	scenarios := map[string]struct {
-		order    *cmacme.Order
-		a        *admissionv1.AdmissionRequest
-		errs     []*field.Error
-		warnings validation.WarningList
-	}{
-		"Order updated to v1alpha2 version": {
-			order: &cmacme.Order{
-				Spec: cmacme.OrderSpec{
-					Request: []byte("testing"),
-				},
-			},
-			a: &admissionv1.AdmissionRequest{
-				RequestKind: &metav1.GroupVersionKind{Group: "acme.cert-manager.io",
-					Version: "v1alpha2",
-					Kind:    "Order"},
-			},
-			warnings: validation.WarningList{
-				fmt.Sprintf(deprecationMessageTemplate,
-					cmacmev1alpha2.SchemeGroupVersion.String(),
-					"Order",
-					cmacmev1.SchemeGroupVersion.String(),
-					"Order"),
-			},
-		},
-		"Order updated to v1alpha3 version": {
-			order: &cmacme.Order{
-				Spec: cmacme.OrderSpec{
-					Request: []byte("testing"),
-				},
-			},
-			a: &admissionv1.AdmissionRequest{
-				RequestKind: &metav1.GroupVersionKind{Group: "acme.cert-manager.io",
-					Version: "v1alpha3",
-					Kind:    "Order"},
-			},
-			warnings: validation.WarningList{
-				fmt.Sprintf(deprecationMessageTemplate,
-					cmacmev1alpha3.SchemeGroupVersion.String(),
-					"Order",
-					cmacmev1.SchemeGroupVersion.String(),
-					"Order"),
-			},
-		},
-		"Order updated to v1beta1 version": {
-			order: &cmacme.Order{
-				Spec: cmacme.OrderSpec{
-					Request: []byte("testing"),
-				},
-			},
-			a: &admissionv1.AdmissionRequest{
-				RequestKind: &metav1.GroupVersionKind{Group: "acme.cert-manager.io",
-					Version: "v1beta1",
-					Kind:    "Order"},
-			},
-			warnings: validation.WarningList{
-				fmt.Sprintf(deprecationMessageTemplate,
-					cmacmev1beta1.SchemeGroupVersion.String(),
-					"Order",
-					cmacmev1.SchemeGroupVersion.String(),
-					"Order"),
-			},
-		},
-	}
-	for n, s := range scenarios {
-		t.Run(n, func(t *testing.T) {
-			errs, warnings := ValidateOrder(s.a, s.order)
+			errs, warnings := ValidateOrderUpdate(nil, s.old, s.new)
 			if len(errs) != len(s.errs) {
 				t.Errorf("Expected %v but got %v", s.errs, errs)
 				return

@@ -35,14 +35,8 @@ module_name="github.com/jetstack/cert-manager"
 
 # Generate deepcopy functions for all internal and external APIs
 deepcopy_inputs=(
-  pkg/apis/certmanager/v1alpha2 \
-  pkg/apis/certmanager/v1alpha3 \
-  pkg/apis/certmanager/v1beta1 \
   pkg/apis/certmanager/v1 \
   pkg/internal/apis/certmanager \
-  pkg/apis/acme/v1alpha2 \
-  pkg/apis/acme/v1alpha3 \
-  pkg/apis/acme/v1beta1 \
   pkg/apis/acme/v1 \
   pkg/internal/apis/acme \
   pkg/apis/meta/v1 \
@@ -57,40 +51,13 @@ client_subpackage="pkg/client"
 client_package="${module_name}/${client_subpackage}"
 # Generate clientsets, listers and informers for user-facing API types
 client_inputs=(
-  pkg/apis/certmanager/v1alpha2 \
-  pkg/apis/certmanager/v1alpha3 \
-  pkg/apis/certmanager/v1beta1 \
   pkg/apis/certmanager/v1 \
-  pkg/apis/acme/v1alpha2 \
-  pkg/apis/acme/v1alpha3 \
-  pkg/apis/acme/v1beta1 \
   pkg/apis/acme/v1 \
 )
 
 # Generate defaulting functions to be used by the mutating webhook
 defaulter_inputs=(
-  pkg/internal/apis/certmanager/v1alpha2 \
-  pkg/internal/apis/certmanager/v1alpha3 \
-  pkg/internal/apis/certmanager/v1beta1 \
   pkg/internal/apis/certmanager/v1 \
-  pkg/internal/apis/acme/v1alpha2 \
-  pkg/internal/apis/acme/v1alpha3 \
-  pkg/internal/apis/acme/v1beta1 \
-  pkg/internal/apis/acme/v1 \
-  pkg/internal/apis/meta/v1 \
-  pkg/webhook/handlers/testdata/apis/testgroup/v2 \
-  pkg/webhook/handlers/testdata/apis/testgroup/v1 \
-)
-
-# Generate conversion functions to be used by the conversion webhook
-conversion_inputs=(
-  pkg/internal/apis/certmanager/v1alpha2 \
-  pkg/internal/apis/certmanager/v1alpha3 \
-  pkg/internal/apis/certmanager/v1beta1 \
-  pkg/internal/apis/certmanager/v1 \
-  pkg/internal/apis/acme/v1alpha2 \
-  pkg/internal/apis/acme/v1alpha3 \
-  pkg/internal/apis/acme/v1beta1 \
   pkg/internal/apis/acme/v1 \
   pkg/internal/apis/meta/v1 \
   pkg/webhook/handlers/testdata/apis/testgroup/v2 \
@@ -104,7 +71,6 @@ deepcopygen=$PWD/$3
 informergen=$PWD/$4
 listergen=$PWD/$5
 defaultergen=$PWD/$6
-conversiongen=$PWD/$7
 
 shift 7
 
@@ -244,35 +210,6 @@ gen-defaulters() {
   done
 }
 
-gen-conversions() {
-  clean pkg/internal/apis 'zz_generated.conversion.go'
-  clean pkg/webhook/handlers/testdata/apis 'zz_generated.conversion.go'
-  echo "Generating conversion functions..." >&2
-  # meta api
-  "$conversiongen" --go-header-file hack/boilerplate/boilerplate.generatego.txt \
-    --input-dirs github.com/jetstack/cert-manager/pkg/internal/apis/meta/v1 \
-    -O zz_generated.conversion
-  # acme and certmanager apis
-  for v in v1alpha2 v1alpha3 v1beta1 v1
-  do
-    "$conversiongen" --go-header-file hack/boilerplate/boilerplate.generatego.txt \
-      --input-dirs "github.com/jetstack/cert-manager/pkg/internal/apis/acme/$v" \
-      -O zz_generated.conversion \
-      --extra-dirs github.com/jetstack/cert-manager/pkg/internal/apis/meta/v1
-    "$conversiongen" --go-header-file hack/boilerplate/boilerplate.generatego.txt \
-      --input-dirs "github.com/jetstack/cert-manager/pkg/internal/apis/certmanager/$v" \
-      -O zz_generated.conversion \
-      --extra-dirs "github.com/jetstack/cert-manager/pkg/internal/apis/meta/v1,github.com/jetstack/cert-manager/pkg/internal/apis/acme/$v"
-  done
-  # test apis
-  "$conversiongen" --go-header-file hack/boilerplate/boilerplate.generatego.txt \
-    --input-dirs github.com/jetstack/cert-manager/pkg/webhook/handlers/testdata/apis/testgroup/v2,github.com/jetstack/cert-manager/pkg/webhook/handlers/testdata/apis/testgroup/v1 \
-    -O zz_generated.conversion
-  # copy into source folder
-  for dir in "${conversion_inputs[@]}"; do
-    copyfiles "$dir" "zz_generated.conversion.go"
-  done
-}
 
 runfiles="$(pwd)"
 export GO111MODULE=off
@@ -291,7 +228,6 @@ gen-clientsets
 gen-listers
 gen-informers
 gen-defaulters
-gen-conversions
 
 ## Call update-bazel
 export GO111MODULE=on

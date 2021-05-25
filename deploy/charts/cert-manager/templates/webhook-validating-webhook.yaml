@@ -31,13 +31,13 @@ webhooks:
           - "cert-manager.io"
           - "acme.cert-manager.io"
         apiVersions:
-          - "*"
+          - "v1"
         operations:
           - CREATE
           - UPDATE
         resources:
           - "*/*"
-    admissionReviewVersions: ["v1", "v1beta1"]
+    admissionReviewVersions: ["v1"] 
     timeoutSeconds: {{ .Values.webhook.timeoutSeconds }}
     failurePolicy: Fail
     sideEffects: None
