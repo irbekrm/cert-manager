@@ -17,6 +17,7 @@ limitations under the License.
 package options
 
 import (
+	"crypto/tls"
 	"strings"
 
 	"github.com/spf13/pflag"
@@ -80,7 +81,8 @@ func (o *WebhookOptions) AddFlags(fs *pflag.FlagSet) {
 	tlsPossibleVersions := cliflag.TLSPossibleVersions()
 	fs.StringVar(&o.MinTLSVersion, "tls-min-version", o.MinTLSVersion,
 		"Minimum TLS version supported. "+
-			"Possible values: "+strings.Join(tlsPossibleVersions, ", "))
+			"Possible values: "+strings.Join(tlsPossibleVersions, ", ")+
+			" (default: "+tlsVersions[cliflag.DefaultTLSVersion()]+").")
 }
 
 func FileTLSSourceEnabled(o WebhookOptions) bool {
@@ -95,4 +97,11 @@ func DynamicTLSSourceEnabled(o WebhookOptions) bool {
 		return true
 	}
 	return false
+}
+
+var tlsVersions = map[uint16]string{
+	tls.VersionTLS10: "VersionTLS10",
+	tls.VersionTLS11: "VersionTLS11",
+	tls.VersionTLS12: "VersionTLS12",
+	tls.VersionTLS13: "VersionTLS13",
 }
