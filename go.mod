@@ -69,9 +69,6 @@ require (
 
 replace golang.org/x/net => golang.org/x/net v0.0.0-20210224082022-3d97a244fca7
 
-// To be replaced once there is a release of kubernetes/apiserver that uses gnostic v0.5. See https://github.com/jetstack/cert-manager/pull/3926#issuecomment-828923436
-replace github.com/googleapis/gnostic => github.com/googleapis/gnostic v0.4.1
-
 // See https://github.com/jetstack/cert-manager/issues/3999
 replace github.com/onsi/ginkgo => github.com/onsi/ginkgo v1.12.1
 
